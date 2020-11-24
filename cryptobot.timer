@@ -1,0 +1,9 @@
+[Unit]
+Description=Analyze the network and make trades every hour
+
+[Timer]
+OnCalendar=*:30
+Persistent=false
+
+[Install]
+timers.target

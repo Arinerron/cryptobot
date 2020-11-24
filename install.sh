@@ -10,7 +10,7 @@ error() {
 # configuration
 ######
 
-DEB_PACKAGES=(python3 pip3 sqlite3)
+DEB_PACKAGES=(python3 python3-pip sqlite3)
 
 ######
 # script
@@ -32,3 +32,15 @@ for package in "${DEB_PACKAGES[@]}"; do
     fi
 done
 
+
+python3 setup.py --install
+
+mkdir -p /usr/share/cryptobot
+cp -n config.yml.example /usr/share/cryptobot/config.yml
+cp -u cryptobot.service cryptobot.timer /usr/lib/systemd/system/
+
+/usr/bin/cryptobot status
+
+systemctl daemon-reload
+systemctl enable cryptobot.timer
+systemctl start cryptobot.timer

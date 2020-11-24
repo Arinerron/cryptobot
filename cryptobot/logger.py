@@ -12,7 +12,7 @@ LOG_DEBUG, LOG_DBG = 0, 0
 
 log_settings = {
     LOG_DEBUG: {
-        'prefix': '  *'
+        'prefix': ' * '
     },
     LOG_INFO: {
         'prefix': '[*]'

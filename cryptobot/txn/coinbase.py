@@ -74,7 +74,8 @@ def order(txn_side: str, txn_size: float, txn_funds: float):
     logger.info(f'Placing {txn_side.upper()} order :: {product_id} :: %.2f ETH || %.2f USD...' % (txn_size, txn_funds))
     
     # https://docs.pro.coinbase.com/#place-a-new-order
-    results = requests.post(BASE_URL + '/orders', json=parameters, auth=auth).json()
+    #results = requests.post(BASE_URL + '/orders', json=parameters, auth=auth).json()
+    return print('PLACING ORDER', parameters)
     assert results.get('message') != 'Forbidden', 'Permission to trade denied, check API key permissions.'
     time.sleep(API_DELAY)
     

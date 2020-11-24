@@ -10,7 +10,7 @@ def database():
     
     # create the database if not exist
     if not conn:
-        conn = sqlite3.connect('./history.db', detect_types=sqlite3.PARSE_DECLTYPES)
+        conn = sqlite3.connect('/usr/share/cryptobot/history.db', detect_types=sqlite3.PARSE_DECLTYPES)
         _init_database(conn)
     
     return conn.cursor()

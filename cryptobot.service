@@ -1,0 +1,6 @@
+[Unit]
+Description=a proprietary cryptocurrency trading bot
+
+[Service]
+ExecStart=/usr/bin/cryptobot analyze-market
+

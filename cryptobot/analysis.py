@@ -77,8 +77,8 @@ def curve(value: float, max_score: int) -> float:
 def get_portfolio_value(use_cache: bool=True) -> float:
     current_price = history.get_current_price(use_cache=use_cache)
     balance = txn.get_balance(use_cache=use_cache)
-    usd_balance = balance['USD']['balance']
-    coin_balance = balance[config.get('bot.coin')]['balance']
+    usd_balance = float(balance['USD']['balance'])
+    coin_balance = float(balance[config.get('bot.coin')]['balance'])
     return usd_balance + (coin_balance * current_price)
 
 
@@ -106,22 +106,35 @@ def get_movement_score() -> float:
 # check the market for new movements and make actions if necessary (main function)
 def analyze_market():
     movement_score = get_movement_score()
-    last_movement_score = None # TODO
+    logger.debug('Movement score: %.6f' % movement_score)
+    last_movement_score = None
     
+    # find the last_movement_score from the database
     c = database.database()
     r = c.execute('SELECT datetime(`ts`, \'localtime\'), `score` FROM `movement_score_history` WHERE `product_id`=? ORDER BY id DESC LIMIT 1', (config.get('bot.coin') + '-USD',))
     row = r.fetchone()
     c.close()
     
-    # if there was result / this is not the first run
+    # if there was result (i.e. this is not the first run)
     if row:
-        # ensure it's been at least an hour (about) since the last run
         ts, last_movement_score = row
-        if time.time() - datetime.datetime.strptime(ts, '%Y-%m-%d %H:%M:%S').timestamp() < ((60 * 60) - 10):
-            logger.warning('Not running analysis as it has already run within the past hour.')
-            return
+        time_since_last_run = time.time() - datetime.datetime.strptime(ts, '%Y-%m-%d %H:%M:%S').timestamp()
+        
+        time_buffer = 10 # how many seconds off is acceptable
+        analysis_runs_every = 60 * 60 # how many seconds between each run. DO NOT CHANGE THIS!
+        
+        # ensure the last movement score is valid
+        if time_since_last_run < analysis_runs_every - time_buffer:
+            # nope! it's already run, so we don't need to / shouldn't run it again
+            logger.warning('Skipping analysis as it has already run within the past hour.')
+            return False
+        elif time_since_last_run > (2 * analysis_runs_every) + time_buffer:
+            # nope! the change score is too old
+            # otherwise we could misinterpret the movement change score
+            logger.warning('Analysis did not run last hour, so the last movement score is stale.')
+            return False
     
-    # store the movement score in the db for future fetching
+    # store the movement score in the db for future fetching regardless of if first run
     c = database.database()
     c.execute('INSERT INTO `movement_score_history` (`product_id`, `score`) VALUES (?, ?)', (config.get('bot.coin') + '-USD', movement_score))
     database.commit()
@@ -129,10 +142,9 @@ def analyze_market():
     
     # check if first run
     if last_movement_score == None:
+        # nope! we need at least one data point for analysis
         logger.warning('Skipping analysis as this is the first run.')
-        return
-    
-    assert False, 'no going past here!'
+        return False
     
     # find the change in movement scores and normlize to 0 to 1 (instead of 0 to len(WEIGHTS)*2)
     movement_change_score = abs(movement_score - last_movement_score) / (len(WEIGHTS) * 2)
@@ -140,15 +152,17 @@ def analyze_market():
 
     # check if we should take action
     if movement_change_score >= minimum_movement_change_score_to_take_action:
-        logger.debug('Movement change score %.2f is large enough to justify taking action.' % movement_change_score)
+        logger.debug('Movement change score %.6f is large enough to justify taking action.' % movement_change_score)
         
         # get the current balance
         balance = txn.get_balance(use_cache=False) # NOTE: do not cache this!
-        usd_balance = balance['USD']['available']
-        coin_balance = balance[config.get('bot.coin')]['available']
+        usd_balance = float(balance['USD']['available'])
+        coin_balance = float(balance[config.get('bot.coin')]['available'])
         
         # calculate balance multiplier for calculating txn size
         balance_multiplier = math.sqrt(movement_score)
+        assert balance_multiplier <= 1, 'Invalid balance multiplier: >1'
+        assert balance_multiplier >= 0, 'Invalid balance multiplier: <0'
         
         # get trade minimums
         min_coin, min_usd = get_minimum_trade_size()
@@ -182,8 +196,12 @@ def analyze_market():
                 txn_size = 0
                 txn_funds = 0
         
+        # check if we should place an order (both 0's -> no order)
         if not (txn_size == 0 and txn_funds == 0):
+            logger.debug('Balance before transaction :: %.2f %s || %.2f USD' % (coin_balance, config.get('bot.coin'), usd_balance))
+            
             # place order
             order = txn.order(txn_side, txn_size, txn_funds)
+            return order
     else:
-        logger.debug('Movement change score %.2f IS NOT large enough to justify taking action.' % movement_change_score)
+        logger.debug('Movement change score %.6f IS NOT large enough to justify taking action.' % movement_change_score)

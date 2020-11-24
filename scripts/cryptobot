@@ -1,0 +1,43 @@
+#!/usr/bin/env python3
+
+import shutil
+import os
+import time
+import datetime
+import argparse
+
+
+SHARE_PATH = '/usr/share/cryptobot'
+
+
+# make /usr/share/cryptobot before importing it so it can create the sqlite db
+try:
+    os.makedirs(SHARE_PATH)
+except PermissionError as e:
+    print('Permission denied. Are you root?')
+    raise e
+except FileExistsError:
+    pass
+
+try:
+    import cryptobot
+except ModuleNotFoundError as e:
+    print('Cannot import cryptobot module, is the bot installed properly?')
+    #raise e
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers(dest='subparser')
+
+    parser_status = subparsers.add_parser('status')
+    parser_analyze_market = subparsers.add_parser('analyze-market')
+    
+    args = parser.parse_args()
+    
+    if args.subparser == 'status':
+        
+    elif args.subparser == 'analyze-market':
+        cryptobot.logger.info('Performing market analysis as of %s (%d)...' % (str(datetime.datetime.now()), time.time()))
+        cryptobot.analysis.analyze_market()
+        cryptobot.logger.info('Done performing analysis. Run this command again in an hour.')
