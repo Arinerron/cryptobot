@@ -19,9 +19,9 @@ class CoinbaseExchangeAuth(requests.auth.AuthBase):
 
     def __call__(self, request):
         timestamp = str(time.time())
-        message = timestamp + request.method + request.path_url + (request.body or '')
+        message = timestamp.encode() + request.method.encode() + request.path_url.encode() + (request.body or b'')
         hmac_key = base64.b64decode(self.secret_key)
-        signature = hmac.new(hmac_key, message.encode(), hashlib.sha256)
+        signature = hmac.new(hmac_key, message, hashlib.sha256)
         signature_b64 = base64.b64encode(signature.digest()).decode().rstrip('\n')
 
         request.headers.update({
@@ -48,41 +48,5 @@ BASE_URL = 'https://api.pro.coinbase.com'
 SANDBOX_URL = 'https://api-public.sandbox.pro.coinbase.com'
 
 
-# returns the coin and USD wallet balances in a dict
-def coinbase_accounts() -> dict:
-    logger.debug('Fetching Coinbase account balance...')
-    results = {x['currency']: x for x in requests.get(BASE_URL + '/accounts', auth=auth).json() if x['currency'] in ['USD', config.get('bot.coin')]}
-    time.sleep(API_DELAY)
-    return results
 
 
-# returns the coin price at a given unix timestamp in history
-def get_historic_price(unixts: int) -> float:
-    product_id = config.get('bot.coin') + '-USD'
-    logger.debug(f'Fetching {product_id} price at unix timestamp %d...' % unixts)
-
-    # fetch timestamp data
-    encode_ts = lambda ts: datetime.datetime.utcfromtimestamp(ts).isoformat() # ISO 8601
-    start = encode_ts(unixts)
-    end = encode_ts(unixts+60)
-    r = requests.get(BASE_URL + f'/products/{product_id}/candles?start={start}&end={end}&granularity=60', auth=auth).json()
-
-    # sanity checks against price data returned
-    assert r, 'No price history for unixts %d!' % unixts
-    r = r[-1] # pull the last from the list of candles
-    assert abs(unixts - r[0]) < 60, 'Price value returned is for a timestamp that is too far away from the requested timestamp (>60sec)! Unixts: %d, r[0]: %d' % (unixts, r[0])
-
-    open_price = r[3]
-    volume = r[5]
-
-    time.sleep(API_DELAY)
-    return float(open_price)
-
-
-# get the current price of the selected coin
-def get_current_price() -> float:
-    product_id = config.get('bot.coin') + '-USD'
-    logger.debug(f'Fetching current {product_id} price...')
-    result = requests.get(BASE_URL + f'/products/{product_id}/ticker').json()['price']
-    time.sleep(API_DELAY)
-    return float(result)

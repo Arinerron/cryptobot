@@ -2,6 +2,8 @@ config.yml
 config.yaml
 config.yml.bak
 
+history.db
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
