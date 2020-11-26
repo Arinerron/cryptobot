@@ -42,7 +42,7 @@ def getStats() -> list:
 
     # portfolio balance
     balance = cryptobot.analysis.txn.get_balance()
-    stats += [('Portfolio balance', ' :: '.join(['%.4f %s' % (deets['balance'], coin) for coin, deets in balance.items()]))]
+    stats += [('Portfolio balance', ' :: '.join(['%.4f %s' % (float(deets['balance']), coin) for coin, deets in balance.items()]))]
 
     # number of orders
     r = c.execute('SELECT COUNT(*) AS numb FROM `orders` WHERE `product_id`=?', (product_id,))
