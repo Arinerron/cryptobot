@@ -13,6 +13,9 @@ SHARE_PATH = '/usr/share/cryptobot'
 # make /usr/share/cryptobot before importing it so it can create the sqlite db
 try:
     os.makedirs(SHARE_PATH)
+    
+    if os.geteuid() != 0:
+        raise PermissionError('You must be root to run this script')
 except PermissionError as e:
     print('Permission denied. Are you root?')
     raise e
@@ -21,6 +24,7 @@ except FileExistsError:
 
 try:
     import cryptobot
+    from cryptobot import logger, database, config
 except ModuleNotFoundError as e:
     print('Cannot import cryptobot module, is the bot installed properly?')
     #raise e
@@ -32,12 +36,59 @@ if __name__ == '__main__':
 
     parser_status = subparsers.add_parser('status')
     parser_analyze_market = subparsers.add_parser('analyze-market')
+    parser_analyze_market = subparsers.add_parser('check-price')
     
     args = parser.parse_args()
     
     if args.subparser == 'status':
+        logger.info('Performing cryptobot status check...')
         
+        if not os.path.isfile('/usr/share/cryptobot/history.db'):
+            logger.warning('The history database does not exist yet. Have you run an analysis yet?')
+            exit(0)
+        
+        # find the last_movement_score from the database
+        c = database.database()
+        r = c.execute('SELECT datetime(`ts`, \'localtime\'), `score` FROM `movement_score_history` WHERE `product_id`=? ORDER BY id DESC LIMIT 1', (config.get('bot.coin') + '-USD',))
+        row = r.fetchone()
+        c.close()
+        
+        # if there was result (i.e. this is not the first run)
+        if row:
+            ts, last_movement_score = row
+            ts = datetime.datetime.strptime(ts, '%Y-%m-%d %H:%M:%S').timestamp()
+            time_since_last_run = time.time() - ts
+            
+            time_buffer = 10 # how many seconds off is acceptable
+            analysis_runs_every = 60 * 60 # how many seconds between each run. DO NOT CHANGE THIS!
+            
+            # ensure the last movement score is valid
+            if time_since_last_run < analysis_runs_every - time_buffer:
+                # nope! it's already run, so we don't need to / shouldn't run it again
+                logger.info('Analysis ran within the past hour (ts=%d, last_score=%.6f).' % (ts, last_movement_score))
+            elif time_since_last_run > (2 * analysis_runs_every) + time_buffer:
+                # nope! the change score is too old
+                # otherwise we could misinterpret the movement change score
+                logger.warning('Analysis did not run last hour.')
+            else:
+                logger.info('Analysis has not run within the last hour but the score is not stale (cur_ts=%d, ts=%d, last_score=%.6f).' % (time.time(), ts, last_movement_score))
+        else:
+            logger.warning('Analysis has never been performed; history.db is empty.')
     elif args.subparser == 'analyze-market':
-        cryptobot.logger.info('Performing market analysis as of %s (%d)...' % (str(datetime.datetime.now()), time.time()))
+        logger.info('Performing market analysis as of %s (%d)...' % (str(datetime.datetime.now()), time.time()))
         cryptobot.analysis.analyze_market()
-        cryptobot.logger.info('Done performing analysis. Run this command again in an hour.')
+        logger.info('Done performing analysis. Run this command again in an hour.')
+    elif args.subparser == 'check-price':
+        logger.info('Checking the coin\'s current price (as of %d) and storing in the database...' % time.time())
+        # NOTE: dont use cache; it doesn't track which coin it's caching
+        # XXX/HACK: this is pretty hacky
+        if config.get('bot.coin') not in ['BTC', 'ETH']:
+            coin_price = cryptobot.analysis.history.get_current_price(use_cache=False, commit=False)
+            logger.info('Current configured coin price is %.2f USD / coin.' % coin_price)
+        btc_price = cryptobot.analysis.history.get_current_price(use_cache=False, product_id_override='BTC-USD', commit=False)
+        logger.info('Current BTC-USD price is %.2f USD / BTC.' % btc_price)
+        eth_price = cryptobot.analysis.history.get_current_price(use_cache=False, product_id_override='ETH-USD')
+        logger.info('Current ETH-USD price is %.2f USD / ETH.' % eth_price)
+        # NOTE: the coin cache is corrupted at this point, don't do more logic!
+    
+    

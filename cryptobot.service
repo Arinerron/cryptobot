@@ -2,5 +2,5 @@
 Description=a proprietary cryptocurrency trading bot
 
 [Service]
-ExecStart=/usr/bin/cryptobot analyze-market
+ExecStart=/usr/local/bin/cryptobot analyze-market
 

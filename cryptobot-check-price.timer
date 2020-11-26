@@ -1,0 +1,9 @@
+[Unit]
+Description=save cryptocurrency prices every minute
+
+[Timer]
+OnActiveSec=*:*
+Persistent=false
+
+[Install]
+WantedBy=timers.target
