@@ -1,4 +1,29 @@
 bot:
+  # these can be one of [coinbase, sim]
+  history-harness: coinbase
+  txn-harness: coinbase
+
+  # logging
+  log:
+    file: debug
+    stdout: debug
+
+  # any Coinbase Pro product "{coin}-USD"
+  coin: ETH
+
+  # this specifies how easily the bot should take decisions to buy/sell. The
+  # higher the number, the more trades the bot will do, and vice versa.
+  # Generally, a higher volatliity number is better. Idk why.
+  volatility: 2500
+
+  # minimum trade sizes depend on how much you have
+  min-trade:
+    usd: 50 # buy with no less than $50
+    coin: 0.01 # sell no less than 0.01 coin
 coinbase:
-  api-pw: ...
+  enable-trades: false
+
+  # cryptobot-test
+  api-key: ...
   api-secret: ...
+  api-pw: ...
