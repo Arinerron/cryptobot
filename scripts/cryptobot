@@ -39,7 +39,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    logger.debug('Command: $ ' + ' '.join([("'%s'" % x if ' ' in x else x) for x in sys.argv]))
+    logger.debug('$ ' + ' '.join([("'%s'" % x if ' ' in x else x) for x in sys.argv]))
     if args.subparser == 'status':
         logger.info('Performing cryptobot status check...')
 
