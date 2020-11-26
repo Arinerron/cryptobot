@@ -29,6 +29,47 @@ except ModuleNotFoundError as e:
     raise e
 
 
+def getStats() -> list:
+    stats = list()
+    product_id = config.get('bot.coin') + '-USD'
+
+    c = database.database()
+
+    # coin type
+    stats += [('Product ID', product_id)]
+
+    # TODO: more order related things, like # buy/sells, total trade volume, current market trend, etc
+
+    # portfolio balance
+    balance = cryptobot.analysis.txn.get_balance()
+    stats += [('Portfolio balance', ' :: '.join([str(deets['balance']) + ' ' + coin for coin, deets in balance.items()]))]
+
+    # number of orders
+    r = c.execute('SELECT COUNT(*) AS numb FROM `orders` WHERE `product_id`=?', (product_id,))
+    row = r.fetchone()
+    numb = 0
+    if row:
+        numb = int(row[0])
+    stats += [('Total number of orders', numb)]
+
+    # number of analysis jobs run
+    r = c.execute('SELECT COUNT(*) AS numb FROM `movement_score_history` WHERE `product_id`=?', (product_id,))
+    row = r.fetchone()
+    numb = 0
+    if row:
+        numb = int(row[0])
+    stats += [('Total number of analysis jobs run', numb)]
+
+    # number of cached price history datapoints
+    r = c.execute('SELECT COUNT(*) AS numb FROM `price_history` WHERE `product_id`=?', (product_id,))
+    row = r.fetchone()
+    numb = 0
+    if row:
+        numb = int(row[0])
+    stats += [('Total number of price history datapoints', numb)]
+
+    c.close()
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest='subparser')
@@ -75,6 +116,13 @@ if __name__ == '__main__':
                 logger.info('Analysis ran %s ago which is not within the last hour, but the score is not stale (cur_ts=%d, ts=%d, last_score=%.6f).' % (format_seconds(time_since_last_run), time.time(), ts, last_movement_score))
         else:
             logger.warning('Analysis has never been performed; history.db is empty.')
+            exit()
+
+        logger.info('-'*80)
+        logger.info('[ Statistics ]')
+        for stat in getStats():
+            name, numb = stat
+            logger.info('... %s: %d' % (name, numb))
     elif args.subparser == 'analyze-market':
         logger.info('Performing market analysis as of %s (%d)...' % (str(datetime.datetime.now()), time.time()))
         cryptobot.analysis.analyze_market()
