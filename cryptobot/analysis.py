@@ -22,18 +22,18 @@ txn = {
 }.get(config.get('bot.txn-harness', 'coinbase'))
 assert txn != None, 'Invalid transaction (txn) harness specified'
 
-# we want to weigh different price changes over time 
+# we want to weigh different price changes over time
 WEIGHTS = {
     # hours ago: weight multiplier
     1: 0.4, # 1 hour ago
     1 * 24: 0.3, # 1 day ago
     1 * 24 * 7: 0.2, # 1 week ago
     1 * 24 * 7 * 4: 0.1 # 1 month ago
-    
-    # NOTE: we don't do "1 year ago" or anything longer because cryptocurrency 
+
+    # NOTE: we don't do "1 year ago" or anything longer because cryptocurrency
     #   bubbles tend to happen every year. We want the price direction to be
-    #   at least somewhat consistent (though we can never predict this) for 
-    #   all of the weighted percentges. The best we can do is keep the 
+    #   at least somewhat consistent (though we can never predict this) for
+    #   all of the weighted percentges. The best we can do is keep the
     #   percentages within the average bubble timeframe.
 }
 
@@ -56,17 +56,40 @@ def curve(value: float, max_score: int) -> float:
     return sign(value) * max_score * (1 + (-1 / math.sqrt(abs(value) + 1)))
 
 
+# number of seconds => human readable format
+def format_seconds(seconds: int) -> str:
+    f = {
+        'y': 31557600, # roughly
+        'mo': 2592000, # roughly
+        'd': 60*60*24,
+        'h': 60*60,
+        'm': 60,
+        's': 1,
+    }
+
+    build = ''
+    seconds = int(seconds)
+    for fmt, s in f.items():
+        if seconds < s:
+            continue
+
+        build += str(seconds // s) + fmt
+        seconds = seconds - ((seconds // s) * s)
+
+    return build
+
+
 ################################################################################
 # Bot's main market analysis functions
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# - "Movement score" is a number from 0 to 10, where anything above 5 means bull 
+# - "Movement score" is a number from 0 to 10, where anything above 5 means bull
 #   market, and anything below 5 means bear market.
 # - "Movement change score" is a score from 0 to 1 that represents how intense a
 #   bull/bear market is by figuring in past movement scores.
-# - "Volatility" is a setting that specifies how easily the bot should take 
+# - "Volatility" is a setting that specifies how easily the bot should take
 #   decisions to buy/sell. The higher the number, the more trades the bot will
 #   do, and vice versa. Generally, a higher volatliity number is better. Idk why
-# - "Market direction" is a number that is either -1 or 1 that means bear or 
+# - "Market direction" is a number that is either -1 or 1 that means bear or
 #   bull market, respectively.
 ################################################################################
 
@@ -108,44 +131,46 @@ def analyze_market():
     movement_score = get_movement_score()
     logger.debug('Movement score: %.6f' % movement_score)
     last_movement_score = None
-    
+
     # find the last_movement_score from the database
     c = database.database()
     r = c.execute('SELECT datetime(`ts`, \'localtime\'), `score` FROM `movement_score_history` WHERE `product_id`=? ORDER BY id DESC LIMIT 1', (config.get('bot.coin') + '-USD',))
     row = r.fetchone()
     c.close()
-    
+
     # if there was result (i.e. this is not the first run)
     if row:
         ts, last_movement_score = row
         time_since_last_run = time.time() - datetime.datetime.strptime(ts, '%Y-%m-%d %H:%M:%S').timestamp()
-        
+
         time_buffer = 10 # how many seconds off is acceptable
         analysis_runs_every = 60 * 60 # how many seconds between each run. DO NOT CHANGE THIS!
-        
+
         # ensure the last movement score is valid
         if time_since_last_run < analysis_runs_every - time_buffer:
             # nope! it's already run, so we don't need to / shouldn't run it again
-            logger.warning('Skipping analysis as it has already run within the past hour.')
+            logger.warning('Skipping analysis as it ran %s ago which is within the last hour.' % format_seconds(time_since_last_run))
             return False
         elif time_since_last_run > (2 * analysis_runs_every) + time_buffer:
             # nope! the change score is too old
             # otherwise we could misinterpret the movement change score
-            logger.warning('Analysis did not run last hour, so the last movement score is stale.')
+            logger.warning('Analysis last run %s ago, rendering last movement score stale.' % format_seconds(time_since_last_run))
             return False
-    
+        else:
+            logger.debug('Last analysis job was %s ago.' % format_seconds(time_since_last_run))
+
     # store the movement score in the db for future fetching regardless of if first run
     c = database.database()
     c.execute('INSERT INTO `movement_score_history` (`product_id`, `score`) VALUES (?, ?)', (config.get('bot.coin') + '-USD', movement_score))
     database.commit()
     c.close()
-    
+
     # check if first run
     if last_movement_score == None:
         # nope! we need at least one data point for analysis
         logger.warning('Skipping analysis as this is the first run.')
         return False
-    
+
     # find the change in movement scores and normlize to 0 to 1 (instead of 0 to len(WEIGHTS)*2)
     movement_change_score = abs(movement_score - last_movement_score) / (len(WEIGHTS) * 2)
     minimum_movement_change_score_to_take_action = 1 / (2 * VOLATILITY)
@@ -153,24 +178,24 @@ def analyze_market():
     # check if we should take action
     if movement_change_score >= minimum_movement_change_score_to_take_action:
         logger.debug('Movement change score %.6f is large enough to justify taking action.' % movement_change_score)
-        
+
         # get the current balance
         balance = txn.get_balance(use_cache=False) # NOTE: do not cache this!
         usd_balance = float(balance['USD']['available'])
         coin_balance = float(balance[config.get('bot.coin')]['available'])
-        
+
         # calculate balance multiplier for calculating txn size
         balance_multiplier = math.sqrt(movement_score)
         assert balance_multiplier <= 1, 'Invalid balance multiplier: >1'
         assert balance_multiplier >= 0, 'Invalid balance multiplier: <0'
-        
+
         # get trade minimums
         min_coin, min_usd = get_minimum_trade_size()
-                
+
         txn_side = None # must be one of [buy, sell]
         txn_size = 0 # primary/base currency
         txn_funds = 0 # secondary/quote currency
-        
+
         # should we buy or sell? if the market direction is positive, buy. otherwise, sell.
         # NOTE: Although this seems backwards, I did a ton of tests, and the bot performs
         #   SIGNIFICANTLY better when configured this way.
@@ -179,7 +204,7 @@ def analyze_market():
             # the market is going up, so start buying the coin using USD
             txn_side = 'buy'
             txn_funds = usd_balance * balance_multiplier
-            
+
             # is the transaction too small? skip if so
             if txn_funds < min_usd:
                 logger.debug('Buy transaction of %.4f USD is too small to consider.' % txn_funds)
@@ -189,17 +214,17 @@ def analyze_market():
             # the market is going down, so start selling the coin for USD
             txn_side = 'sell'
             txn_size = coin_balance * balance_multiplier
-            
+
             # is the transaction too small? skip if so
             if txn_size < min_coin:
                 logger.debug('Sell transaction of %.4f coin is too small to consider.' % txn_size)
                 txn_size = 0
                 txn_funds = 0
-        
+
         # check if we should place an order (both 0's -> no order)
         if not (txn_size == 0 and txn_funds == 0):
             logger.debug('Balance before transaction :: %.2f %s || %.2f USD' % (coin_balance, config.get('bot.coin'), usd_balance))
-            
+
             # place order
             order = txn.order(txn_side, txn_size, txn_funds)
             return order
