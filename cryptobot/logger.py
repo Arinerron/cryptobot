@@ -29,7 +29,7 @@ log_settings = {
 }
 
 
-def log(level, message):
+def parse_log_level(level: str) -> int:
     min_level = {
         '0': 0,
         '1': 1,
@@ -45,16 +45,26 @@ def log(level, message):
         'err': 3,
         'critical': 4,
         'fatal': 4
-    }.get(cryptobot.config.get('bot.log-level'))
-    assert min_level != None, 'Invalid log level'
-    assert level in log_settings
+    }.get(level, 'error')
 
-    if level < min_level:
-        return
+    assert min_level != None, 'Invalid log level'
+    assert level in log_settings and min_level in log_settings
+
+    return min_level
+
+
+def log(level: int, message: str):
+    file_level = parse_log_level(cryptobot.config.get('bot.log.file', 'err'))
+    stdout_level = parse_log_level(cryptobot.config.get('bot.log.stdout', 'err'))
 
     settings = log_settings[level]
-    
-    print(settings['prefix'] + ' ' + str(message).strip())
+    data = settings['prefix'] + ' ' + str(message).strip()
+
+    if level >= stdout_level:
+        print(data)
+    if level >= file_level:
+        with open('/var/log/cryptobot.log', 'a') as f:
+            f.write(data + '\n')
 
 
 critical = functools.partial(log, LOG_CRITICAL)
@@ -66,4 +76,3 @@ warn = functools.partial(log, LOG_WARNING)
 info = functools.partial(log, LOG_INFO)
 debug = functools.partial(log, LOG_DEBUG)
 dbg = functools.partial(log, LOG_DBG)
-

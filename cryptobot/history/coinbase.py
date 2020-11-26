@@ -27,21 +27,22 @@ _current_price_cache_time = None
 def get_historic_price(unixts: int) -> float: # TODO: implement caching
     product_id = config.get('bot.coin') + '-USD'
     logger.debug(f'Fetching {product_id} price at unix timestamp %d...' % unixts)
-    
+
     # check if we already have the price history data point
     unixts = int(unixts)
     c = database.database()
-    c.execute(
+    r = c.execute((
+        # XXX: should we ORDER BY so it's `current` before `historic` for source?
         'SELECT `unixts`, `v` AS `spot` FROM ('
             # select the closest two values to what we're looking for
             'SELECT MIN(`unixts`) as `v`, `spot`, `product_id` FROM `price_history` WHERE `product_id`=? AND `unixts` >= ?'
             'UNION SELECT MAX(`unixts`) as `v`, `spot`, `product_id` FROM `price_history` WHERE `product_id`=? AND `unixts` <= ?'
         # then select only values within 5 minutes of what we want
         ') WHERE `unixts` NOT NULL AND ABS(? - `unixts`) <= (60 * 5) ORDER BY ABS(? - `unixts`) ASC LIMIT 1;'
-    ), (product_id, unixts, product_id, unixts, unixts, unixts)
+    ), (product_id, unixts, product_id, unixts, unixts, unixts))
     row = r.fetchone()
     c.close()
-    
+
     # check if we found one in the db
     if row:
         found_unixts, price = row
@@ -62,7 +63,7 @@ def get_historic_price(unixts: int) -> float: # TODO: implement caching
 
     open_price = float(r[3])
     volume = r[5]
-        
+
     # store price history in db
     c = database.database()
     c.execute('INSERT INTO `price_history` (`unixts`, `product_id`, `spot`, `source`) VALUES (?, ?, ?, \'historic\')', (int(unixts), product_id, open_price))
@@ -76,34 +77,34 @@ def get_historic_price(unixts: int) -> float: # TODO: implement caching
 def get_current_price(use_cache: bool=True, product_id_override: str=None, commit: bool=True) -> float:
     global current_price, _current_price_cache_time
     cur_time = time.time()
-    
+
     product_id = config.get('bot.coin') + '-USD' # XXX: changing this mid-program could potentially mess up cached price since it wouldn't update if cached
-    
+
     # XXX/HACK: this is for the `$ cryptobot check-price` command
     if product_id_override:
         product_id = product_id_override
-    
+
     if (not use_cache) or (not _current_price_cache_time or _current_price_cache_time + CACHE_TIMEOUT < cur_time):
         logger.debug(f'Fetching current {product_id} price...')
         result = requests.get(BASE_URL + f'/products/{product_id}/ticker').json()
         time.sleep(API_DELAY)
-        
+
         spot_price = float(result['price'])
         bid_price = float(result['bid'])
         ask_price = float(result['ask'])
         volume = float(result['volume'])
-        
+
         # cache price
         current_price = spot_price
         _current_price_cache_time = cur_time
-        
+
         # store price history in db
         c = database.database()
         c.execute('INSERT INTO `price_history` (`unixts`, `product_id`, `spot`, `bid`, `ask`, `volume`, `source`) VALUES (?, ?, ?, ?, ?, ?, \'current\')', (int(cur_time), product_id, spot_price, bid_price, ask_price, volume))
         if commit:
             database.commit()
         c.close()
-    
+
     return current_price
 
 
@@ -111,6 +112,6 @@ def get_current_price(use_cache: bool=True, product_id_override: str=None, commi
 def get_percent_change(unixts: int, use_cache: bool=True) -> float:
     current_price = get_current_price(use_cache=use_cache)
     historic_price = get_historic_price(unixts)
-    
+
     difference = current_price - historic_price
     return difference / historic_price
