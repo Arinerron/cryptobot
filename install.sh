@@ -41,10 +41,12 @@ done
 mkdir -p /usr/share/cryptobot
 cp -n config.yml.example /usr/share/cryptobot/config.yml
 cp -u cryptobot.service cryptobot.timer /usr/lib/systemd/system/
+cp -u cryptobot-check-price.service cryptobot-check-price.timer /usr/lib/systemd/system/
 
 /usr/local/bin/cryptobot status
 
 systemctl daemon-reload
 systemctl enable cryptobot.timer
 systemctl start cryptobot.timer
-
+systemctl enable cryptobot-check-price.timer
+systemctl start cryptobot-check-price.timer

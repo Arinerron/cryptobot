@@ -2,7 +2,7 @@
 Description=save cryptocurrency prices every minute
 
 [Timer]
-OnActiveSec=*:*
+OnCalendar=*:0/1
 Persistent=false
 
 [Install]
