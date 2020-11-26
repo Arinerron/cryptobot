@@ -2,6 +2,7 @@
 
 import shutil
 import os
+import sys
 import time
 import datetime
 import argparse
@@ -25,7 +26,7 @@ try:
     from cryptobot.analysis import format_seconds
 except ModuleNotFoundError as e:
     print('Cannot import cryptobot module, is the bot installed properly?')
-    #raise e
+    raise e
 
 
 if __name__ == '__main__':
@@ -38,6 +39,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
+    logger.debug('Command: $ ' + ' '.join([("'%s'" % x if ' ' in x else x) for x in sys.argv]))
     if args.subparser == 'status':
         logger.info('Performing cryptobot status check...')
 
@@ -64,6 +66,7 @@ if __name__ == '__main__':
             if time_since_last_run < analysis_runs_every - time_buffer:
                 # nope! it's already run, so we don't need to / shouldn't run it again
                 logger.info('Analysis ran %s ago which is within the past hour (ts=%d, last_score=%.6f).' % (format_seconds(time_since_last_run), ts, last_movement_score))
+                logger.debug('The analysis job should run again in %s, assuming all is well.' % (format_seconds(analysis_runs_every - time_since_last_run)))
             elif time_since_last_run > (2 * analysis_runs_every) + time_buffer:
                 # nope! the change score is too old
                 # otherwise we could misinterpret the movement change score

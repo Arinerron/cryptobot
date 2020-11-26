@@ -150,6 +150,7 @@ def analyze_market():
         if time_since_last_run < analysis_runs_every - time_buffer:
             # nope! it's already run, so we don't need to / shouldn't run it again
             logger.warning('Skipping analysis as it ran %s ago which is within the last hour.' % format_seconds(time_since_last_run))
+            logger.debug('You should rerun analysis in %s.' % (format_seconds(analysis_runs_every - time_since_last_run)))
             return False
         elif time_since_last_run > (2 * analysis_runs_every) + time_buffer:
             # nope! the change score is too old
