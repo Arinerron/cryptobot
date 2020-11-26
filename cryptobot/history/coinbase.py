@@ -33,7 +33,7 @@ def get_historic_price(unixts: int) -> float: # TODO: implement caching
     c = database.database()
     r = c.execute((
         # XXX: should we ORDER BY so it's `current` before `historic` for source?
-        'SELECT `unixts`, `v` AS `spot` FROM ('
+        'SELECT `v` AS `unixts`, `spot` FROM ('
             # select the closest two values to what we're looking for
             'SELECT MIN(`unixts`) as `v`, `spot`, `product_id` FROM `price_history` WHERE `product_id`=? AND `unixts` >= ?'
             'UNION SELECT MAX(`unixts`) as `v`, `spot`, `product_id` FROM `price_history` WHERE `product_id`=? AND `unixts` <= ?'

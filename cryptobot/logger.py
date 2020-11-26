@@ -48,7 +48,7 @@ def parse_log_level(level: str) -> int:
     }.get(level, 'error')
 
     assert min_level != None, 'Invalid log level'
-    assert level in log_settings and min_level in log_settings
+    assert min_level in log_settings
 
     return min_level
 
