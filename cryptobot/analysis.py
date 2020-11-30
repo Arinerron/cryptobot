@@ -46,6 +46,9 @@ VOLATILITY = config.get('bot.volatility', 2500)
 ################################################################################
 
 
+is_bull_market = lambda movement_score: sign(movement_score) == 1
+is_bear_market = lambda movement_score: sign(movement_score) == -1
+
 # returns -1 or 1 depending on whether it's a positive or negative number
 def sign(value: float) -> int:
     return abs(value) / value
@@ -143,7 +146,7 @@ def analyze_market():
         ts, last_movement_score = row
         time_since_last_run = time.time() - datetime.datetime.strptime(ts, '%Y-%m-%d %H:%M:%S').timestamp()
 
-        time_buffer = 10 # how many seconds off is acceptable
+        time_buffer = 60 * 5 # how many seconds off is acceptable
         analysis_runs_every = 60 * 60 # how many seconds between each run. DO NOT CHANGE THIS!
 
         # ensure the last movement score is valid
@@ -176,6 +179,9 @@ def analyze_market():
     movement_change_score = abs(movement_score - last_movement_score) / (len(WEIGHTS) * 2)
     minimum_movement_change_score_to_take_action = 1 / (2 * VOLATILITY)
 
+    assert movement_change_score >= 0, 'Movement change score of %.4f must be >= 0. Current movement score is %.4f and last movement score is %.4f.' % (movement_change_score, movement_score, last_movement_score)
+    assert minimum_movement_change_score_to_take_action >= 0, 'Minimum movement change score required to take action is %.4f which is < 0.' % minimum_movement_change_score_to_take_action
+
     # check if we should take action
     if movement_change_score >= minimum_movement_change_score_to_take_action:
         logger.debug('Movement change score %.6f is large enough to justify taking action.' % movement_change_score)
@@ -186,9 +192,9 @@ def analyze_market():
         coin_balance = float(balance[config.get('bot.coin')]['available'])
 
         # calculate balance multiplier for calculating txn size
-        balance_multiplier = math.sqrt(movement_score)
-        assert balance_multiplier <= 1, 'Invalid balance multiplier: >1'
-        assert balance_multiplier >= 0, 'Invalid balance multiplier: <0'
+        balance_multiplier = math.sqrt(abs(movement_change_score))
+        assert balance_multiplier <= 1, 'Invalid balance multiplier: > 1'
+        assert balance_multiplier >= 0, 'Invalid balance multiplier: < 0'
 
         # get trade minimums
         min_coin, min_usd = get_minimum_trade_size()
@@ -201,7 +207,7 @@ def analyze_market():
         # NOTE: Although this seems backwards, I did a ton of tests, and the bot performs
         #   SIGNIFICANTLY better when configured this way.
         # TODO: Figure out why that is?
-        if sign(movement_score) == 1:
+        if is_bull_market(movement_score):
             # the market is going up, so start buying the coin using USD
             txn_side = 'buy'
             txn_funds = usd_balance * balance_multiplier
@@ -211,7 +217,7 @@ def analyze_market():
                 logger.debug('Buy transaction of %.4f USD is too small to consider.' % txn_funds)
                 txn_size = 0
                 txn_funds = 0
-        else:
+        elif is_bear_market(movement_score):
             # the market is going down, so start selling the coin for USD
             txn_side = 'sell'
             txn_size = coin_balance * balance_multiplier
@@ -221,6 +227,8 @@ def analyze_market():
                 logger.debug('Sell transaction of %.4f coin is too small to consider.' % txn_size)
                 txn_size = 0
                 txn_funds = 0
+        else:
+            raise ValueError('Movement score %.4f did not qualify as bear or bull market!' % movement_score)
 
         # check if we should place an order (both 0's -> no order)
         if not (txn_size == 0 and txn_funds == 0):

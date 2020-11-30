@@ -103,7 +103,7 @@ if __name__ == '__main__':
                 ts = datetime.datetime.strptime(ts, '%Y-%m-%d %H:%M:%S').timestamp()
                 time_since_last_run = time.time() - ts
 
-                time_buffer = 10 # how many seconds off is acceptable
+                time_buffer = 60 * 5 # how many seconds off is acceptable
                 analysis_runs_every = 60 * 60 # how many seconds between each run. DO NOT CHANGE THIS!
 
                 # ensure the last movement score is valid
