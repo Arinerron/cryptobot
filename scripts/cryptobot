@@ -7,14 +7,22 @@ import time
 import datetime
 import argparse
 import traceback
+import pwd
 
 
 # make /usr/share/cryptobot before importing it so it can create the sqlite db
 try:
     os.makedirs('/usr/share/cryptobot')
 
-    if os.geteuid() != 0:
+    cur_uid = os.geteuid()
+    cryptobot_uid = pwd.getpwnam('cryptobot').pw_uid
+
+    if cur_uid not in [0, cryptobot_uid]:
         raise PermissionError('You must be root to run this script')
+    elif cur_uid == 0:
+        # leave root and get cryptobot privs
+        os.setuid(cryptobot_uid)
+        cur_uid = cryptobot_uid
 except PermissionError as e:
     print('Permission denied. Are you root?')
     raise e
@@ -85,10 +93,10 @@ if __name__ == '__main__':
 
         logger.debug('$ ' + ' '.join([("'%s'" % x if ' ' in x else x) for x in sys.argv]))
         if args.subparser == 'status':
-            logger.info('Performing cryptobot status check...')
+            logger.info('Performing cryptobot status check...', show_ts=False)
 
             if not os.path.isfile('/usr/share/cryptobot/history.db'):
-                logger.warning('The history database does not exist yet. Have you run an analysis yet?')
+                logger.warning('The history database does not exist yet. Have you run an analysis yet?', show_ts=False)
                 exit(0)
 
             # find the last_movement_score from the database
@@ -109,27 +117,30 @@ if __name__ == '__main__':
                 # ensure the last movement score is valid
                 if time_since_last_run < analysis_runs_every - time_buffer:
                     # nope! it's already run, so we don't need to / shouldn't run it again
-                    logger.info('Analysis ran %s ago which is within the past hour (ts=%d, last_score=%.6f).' % (format_seconds(time_since_last_run), ts, last_movement_score))
-                    logger.debug('The analysis job should run again in %s, assuming all is well.' % (format_seconds(analysis_runs_every - time_since_last_run)))
+                    logger.info('Analysis ran %s ago which is within the past hour (ts=%d, last_score=%.6f).' % (format_seconds(time_since_last_run), ts, last_movement_score), show_ts=False)
+                    logger.debug('The analysis job should run again in %s, assuming all is well.' % (format_seconds(analysis_runs_every - time_since_last_run)), show_ts=False)
                 elif time_since_last_run > (2 * analysis_runs_every) + time_buffer:
                     # nope! the change score is too old
                     # otherwise we could misinterpret the movement change score
-                    logger.warning('Analysis ran %s ago which is not run last hour.' % format_seconds(time_since_last_run))
+                    logger.warning('Analysis ran %s ago which is not run last hour.' % format_seconds(time_since_last_run), show_ts=False)
                 else:
-                    logger.info('Analysis ran %s ago which is not within the last hour, but the score is not stale (cur_ts=%d, ts=%d, last_score=%.6f).' % (format_seconds(time_since_last_run), time.time(), ts, last_movement_score))
+                    logger.info('Analysis ran %s ago which is not within the last hour, but the score is not stale (cur_ts=%d, ts=%d, last_score=%.6f).' % (format_seconds(time_since_last_run), time.time(), ts, last_movement_score), show_ts=False)
             else:
-                logger.warning('Analysis has never been performed; history.db is empty.')
+                logger.warning('Analysis has never been performed; history.db is empty.', show_ts=False)
                 exit()
 
-            logger.info('-'*80)
-            logger.info('[ Statistics ]')
-            for stat in getStats():
+            logger.info('-'*80, show_ts=False)
+            stats = getStats()
+            logger.info('[ Statistics ]', show_ts=False)
+            for stat in stats:
                 name, numb = stat
-                logger.info('... %s: %s' % (name, str(numb)))
+                logger.info('... %s: %s' % (name, str(numb)), show_ts=False)
+
         elif args.subparser == 'analyze-market':
             logger.info('Performing market analysis as of %s (%d)...' % (str(datetime.datetime.now()), time.time()))
             cryptobot.analysis.analyze_market()
             logger.info('Done performing analysis. Run this command again in an hour or so.')
+
         elif args.subparser == 'check-price':
             logger.info('Checking the coin\'s current price (as of %d) and storing in the database...' % time.time())
             # NOTE: dont use cache; it doesn't track which coin it's caching

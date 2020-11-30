@@ -12,6 +12,11 @@ error() {
 
 export DEB_PACKAGES="python3 python3-pip sqlite3"
 
+export BIN_PATH="/usr/local/bin/cryptobot"
+export SHARE_PATH="/usr/share/cryptobot"
+export LOG_FILE_PATH="/var/log/cryptobot.log"
+export SYSTEMD_PATH="/usr/lib/systemd/system"
+
 ######
 # script
 ######
@@ -38,12 +43,20 @@ done
 
 ./setup.py install
 
-mkdir -p /usr/share/cryptobot
-cp -n config.yml.example /usr/share/cryptobot/config.yml
-cp -u cryptobot.service cryptobot.timer /usr/lib/systemd/system/
-cp -u cryptobot-check-price.service cryptobot-check-price.timer /usr/lib/systemd/system/
+mkdir -p "$SHARE_PATH"
+cp -n config.yml.example "${SHARE_PATH}/config.yml"
 
-/usr/local/bin/cryptobot status
+useradd cryptobot || true
+chown -R cryptobot:cryptobot "$SHARE_PATH" "$LOG_FILE_PATH"
+chmod -R 600 "$SHARE_PATH" "$LOG_FILE_PATH"
+chmod 755 "$SHARE_PATH"
+chown root:cryptobot "$BIN_PATH"
+chmod 750 "$BIN_PATH"
+
+cp -u cryptobot.service cryptobot.timer "$SYSTEMD_PATH"
+cp -u cryptobot-check-price.service cryptobot-check-price.timer "$SYSTEMD_PATH"
+
+"$BIN_PATH" status
 
 systemctl daemon-reload
 systemctl enable cryptobot.timer

@@ -3,4 +3,4 @@ Description=a proprietary cryptocurrency trading bot
 
 [Service]
 ExecStart=/usr/local/bin/cryptobot analyze-market
-
+User=cryptobot

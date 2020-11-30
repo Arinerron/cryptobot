@@ -3,3 +3,4 @@ Description=save cryptocurrency prices every minute
 
 [Service]
 ExecStart=/usr/local/bin/cryptobot check-price
+User=cryptobot

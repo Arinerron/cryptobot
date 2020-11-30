@@ -2,6 +2,7 @@
 
 import cryptobot.config
 import functools
+import datetime
 
 
 LOG_CRITICAL, LOG_FATAL = 4, 4
@@ -12,19 +13,19 @@ LOG_DEBUG, LOG_DBG = 0, 0
 
 log_settings = {
     LOG_DEBUG: {
-        'prefix': ' * '
+        'prefix': 'DEBUG'
     },
     LOG_INFO: {
-        'prefix': '[*]'
+        'prefix': 'INFO'
     },
     LOG_WARNING: {
-        'prefix': '[!]'
+        'prefix': 'WARN'
     },
     LOG_ERROR: {
-        'prefix': '[-]'
+        'prefix': 'ERROR'
     },
     LOG_FATAL: {
-        'prefix': '[X]'
+        'prefix': 'FATAL'
     }
 }
 
@@ -53,12 +54,12 @@ def parse_log_level(level: str) -> int:
     return min_level
 
 
-def log(level: int, message: str):
+def log(level: int, message: str, show_ts=True):
     file_level = parse_log_level(cryptobot.config.get('bot.log.file', 'err'))
     stdout_level = parse_log_level(cryptobot.config.get('bot.log.stdout', 'err'))
 
     settings = log_settings[level]
-    data = settings['prefix'] + ' ' + str(message).strip()
+    data = settings['prefix'] + '\t' + ('[' + str(datetime.datetime.utcnow()) + ' UTC] ' if show_ts else '') + str(message).strip()
 
     if level >= stdout_level:
         print(data)
