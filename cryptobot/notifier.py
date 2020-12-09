@@ -3,10 +3,11 @@
 from cryptobot import config, logger
 import requests
 
-
+_NOTIFIER_LOCK = False # to prevent exceptions from causing recursion on "error" cause
 SUBJECTS = {
     'error': 'Cryptobot Error Detected',
-    'order': 'Cryptobot Order Placed'
+    'order': 'Cryptobot Order Placed',
+    'flash': 'Cryptobot Flash Change Detected'
 }
 
 
@@ -44,26 +45,28 @@ class EmailNotifier:
 
         # XXX: should be url-encoded subject
         # XXX: check response to make sure it worked?
-        requests.post('https://curlmail.co/arinerron@protonmail.com?subject=' + subject, data=msg)
+        response = requests.post('https://curlmail.co/arinerron@protonmail.com?subject=' + subject, data=msg)
 
 
 def _get_handles(key: str) -> list:
     val = [
-        (
-            list(x.keys())[0]
-            if isinstance(x, dict) else
-            x
-        )
+        str(x)
         for x in
         config.get(key, [])
     ]
 
-    assert all([isinstance(str, x) for x in val]), 'All "handle" values must be either a string or dictionary'
-    
+    assert all([isinstance(x, str) for x in val]), 'All "handle" values must be either a string or dictionary'
+
     return ([str(x).lower() for x in val] if isinstance(val, list) else [str(val)])
 
 
-def send(cause: str, *msg):
+def send(cause: str, *msg) -> bool:
+    global _NOTIFIER_LOCK
+    if _NOTIFIER_LOCK:
+        return False
+
+    _NOTIFIER_LOCK = True
+
     cause = str(cause).lower()
     msg = ' '.join([str(x) for x in msg])
 
@@ -76,3 +79,5 @@ def send(cause: str, *msg):
         TwilioNotifier.send(subject, msg)
     if cause in [str(x).lower() for x in config.get('bot.notifications.email.handle', [])]:
         EmailNotifier.send(subject, msg)
+
+    _NOTIFIER_LOCK = False

@@ -4,6 +4,8 @@ import cryptobot.config
 import functools
 import datetime
 
+import cryptobot
+
 
 LOG_CRITICAL, LOG_FATAL = 4, 4
 LOG_ERROR, LOG_ERR = 3, 3
@@ -11,26 +13,32 @@ LOG_WARNING, LOG_WARN = 2, 2
 LOG_INFO = 1
 LOG_DEBUG, LOG_DBG = 0, 0
 
-log_settings = {
-    LOG_DEBUG: {
-        'prefix': 'DEBUG'
-    },
-    LOG_INFO: {
-        'prefix': 'INFO'
-    },
-    LOG_WARNING: {
-        'prefix': 'WARN'
-    },
-    LOG_ERROR: {
-        'prefix': 'ERROR'
-    },
-    LOG_FATAL: {
-        'prefix': 'FATAL'
+
+# XXX/HACK: this is to fix the circular import
+def get_log_settings() -> dict:
+    return {
+        LOG_DEBUG: {
+            'prefix': 'DEBUG'
+        },
+        LOG_INFO: {
+            'prefix': 'INFO'
+        },
+        LOG_WARNING: {
+            'prefix': 'WARN'
+        },
+        LOG_ERROR: {
+            'prefix': 'ERROR',
+            'hook': functools.partial(cryptobot.notifier.send, 'error')
+        },
+        LOG_FATAL: {
+            'prefix': 'FATAL',
+            'hook': functools.partial(cryptobot.notifier.send, 'error')
+        }
     }
-}
 
 
 def parse_log_level(level: str) -> int:
+    log_settings = get_log_settings()
     min_level = {
         '0': 0,
         '1': 1,
@@ -55,6 +63,8 @@ def parse_log_level(level: str) -> int:
 
 
 def log(level: int, message: str, show_ts=True):
+    log_settings = get_log_settings()
+
     file_level = parse_log_level(cryptobot.config.get('bot.log.file', 'err'))
     stdout_level = parse_log_level(cryptobot.config.get('bot.log.stdout', 'err'))
 
@@ -66,6 +76,9 @@ def log(level: int, message: str, show_ts=True):
     if level >= file_level:
         with open('/var/log/cryptobot.log', 'a') as f:
             f.write(data + '\n')
+
+    if settings.get('hook'):
+        settings.get('hook')(message)
 
 
 critical = functools.partial(log, LOG_CRITICAL)

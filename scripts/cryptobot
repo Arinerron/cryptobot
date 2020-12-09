@@ -33,6 +33,7 @@ try:
     import cryptobot
     from cryptobot import logger, database, config
     from cryptobot.analysis import format_seconds
+    from cryptobot import notifier
 except ModuleNotFoundError as e:
     print('Cannot import cryptobot module, is the bot installed properly?')
     raise e
@@ -153,7 +154,9 @@ if __name__ == '__main__':
             eth_price = cryptobot.analysis.history.get_current_price(use_cache=False, product_id_override='ETH-USD')
             logger.info('Current ETH-USD price is %.2f USD / ETH.' % eth_price)
             # NOTE: the coin cache is corrupted at this point, don't do more logic!
-            crypobot.flash.check_flash(use_cache=False)
+            cryptobot.flash.check_flash(use_cache=False)
+            
     except Exception as e:
-        logger.critical('Exception raised:\n' + ''.join(traceback.TracebackException.from_exception(e).format()))
+        msg = 'Exception raised:\n' + ''.join(traceback.TracebackException.from_exception(e).format())
+        logger.critical(msg)
         raise e
