@@ -41,6 +41,7 @@ for package in ${DEB_PACKAGES[@]}; do
     fi
 done
 
+pip3 install --upgrade -r requirements.txt
 ./setup.py install
 
 mkdir -p "$SHARE_PATH"
