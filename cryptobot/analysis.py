@@ -60,6 +60,7 @@ def curve(value: float, max_score: int) -> float:
 
 
 # number of seconds => human readable format
+# XXX/TODO: refactor: move this to logger.py
 def format_seconds(seconds: int) -> str:
     f = {
         'y': 31557600, # roughly

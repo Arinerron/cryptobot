@@ -3,3 +3,4 @@
 from . import config, logger, notifier
 from . import coinbase, txn, history, database
 from . import analysis
+from . import flash

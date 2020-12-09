@@ -48,7 +48,18 @@ class EmailNotifier:
 
 
 def _get_handles(key: str) -> list:
-    val = config.get(key, [])
+    val = [
+        (
+            list(x.keys())[0]
+            if isinstance(x, dict) else
+            x
+        )
+        for x in
+        config.get(key, [])
+    ]
+
+    assert all([isinstance(str, x) for x in val]), 'All "handle" values must be either a string or dictionary'
+    
     return ([str(x).lower() for x in val] if isinstance(val, list) else [str(val)])
 
 

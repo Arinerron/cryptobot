@@ -23,14 +23,15 @@ export SYSTEMD_PATH="/usr/lib/systemd/system"
 
 if [ "x$EUID" != "x0" ]; then
     error 'This script must be run as root'
-    exit 1
+    exit 2
 fi
 
 if [ ! -f "/usr/bin/apt-get" ]; then
     error 'This script is intended to be ran on a Debian-based system'
-    exit 1
+    exit 2
 fi
 
+cd "$(dirname "$0")"
 set -e
 
 # ensure packages are installed
