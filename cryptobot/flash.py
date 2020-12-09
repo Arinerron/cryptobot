@@ -38,7 +38,7 @@ def parse_flash(case: str) -> tuple:
     return abs(percent), total
 
 
-def check_flash():
+def check_flash(use_cache: bool=False):
     bot_flash = config.get('bot.flash', [])
 
     assert isinstance(bot_flash, list)
@@ -47,7 +47,7 @@ def check_flash():
 
     for case in bot_flash:
         percent_threshold, total_offset = parse_flash(case)
-        percent = analysis.history.get_percent_change(time.time() - total_offset, use_cache=True)
+        percent = analysis.history.get_percent_change(time.time() - total_offset, use_cache=use_cache)
         if abs(percent) >= percent_threshold:
             message = 'Flash ' + ('crash' if analysis.is_bear_market(percent) else 'rally') + ' detected; percent change %.4f is above the %.4f threshold for %s.' % (percent, percent_threshold, analysis.format_seconds(total_offset))
             logger.info(message)
