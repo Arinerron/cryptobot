@@ -71,7 +71,7 @@ def order(txn_side: str, txn_size: float, txn_funds: float):
         # desired amount of quote currency to use
         parameters['funds'] = txn_funds
 
-    logger.info(f'Placing {txn_side.upper()} order :: {product_id} :: %.2f ETH || %.2f USD...' % (txn_size, txn_funds))
+    logger.debug(f'Placing {txn_side.upper()} order :: {product_id} :: %.2f ETH || %.2f USD...' % (txn_size, txn_funds))
 
     if not config.get('coinbase.enable-trades', True):
         logger.warning('Nevermind! Coinbase transactions are disabled. Exiting...')

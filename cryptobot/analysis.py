@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from cryptobot import config, logger, database
+from cryptobot import config, logger, database, notifier
 
 import math
 import time
@@ -231,8 +231,15 @@ def analyze_market():
             raise ValueError('Movement score %.4f did not qualify as bear or bull market!' % movement_score)
 
         # check if we should place an order (both 0's -> no order)
-        if not (txn_size == 0 and txn_funds == 0):
+        assert txn_side
+        if txn_size or txn_funds:
+            assert not (txn_size and txn_funds)
+
+            # make pretty print
             logger.debug('Balance before transaction :: %.2f %s || %.2f USD' % (coin_balance, config.get('bot.coin'), usd_balance))
+            message = f'Placing {config.get("bot.coin")}-USD {txn_side.upper()} order of ' + str('%.4f coin' % txn_size if txn_size else '$%.02f USD' % txn_funds) + '...'
+            logger.info(message)
+            notifier.send('order', message)
 
             # place order
             order = txn.order(txn_side, txn_size, txn_funds)
