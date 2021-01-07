@@ -26,7 +26,7 @@ _current_price_cache_time = None
 # returns the coin price at a given unix timestamp in history
 def get_historic_price(unixts: int) -> float: # TODO: implement caching
     product_id = config.get('bot.coin') + '-USD'
-    logger.debug(f'Fetching {product_id} price at unix timestamp %d...' % unixts)
+    #logger.debug(f'Fetching {product_id} price at unix timestamp %d...' % unixts)
 
     # check if we already have the price history data point
     unixts = int(unixts)
@@ -46,7 +46,7 @@ def get_historic_price(unixts: int) -> float: # TODO: implement caching
     # check if we found one in the db
     if row:
         found_unixts, price = row
-        logger.debug('Requested unixts=%d, found cached historic price %.2f USD / coin with unixts=%d in database' % (unixts, price, found_unixts))
+        #logger.debug('Requested unixts=%d, found cached historic price %.2f USD / coin with unixts=%d in database' % (unixts, price, found_unixts))
         return price
 
     # fetch timestamp data
@@ -85,7 +85,7 @@ def get_current_price(use_cache: bool=True, product_id_override: str=None, commi
         product_id = product_id_override
 
     if (not use_cache) or (not _current_price_cache_time or _current_price_cache_time + CACHE_TIMEOUT < cur_time):
-        logger.debug(f'Fetching current {product_id} price...')
+        #logger.debug(f'Fetching current {product_id} price...')
         result = requests.get(BASE_URL + f'/products/{product_id}/ticker').json()
         time.sleep(API_DELAY)
 

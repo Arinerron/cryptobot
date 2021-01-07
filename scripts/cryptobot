@@ -143,7 +143,7 @@ if __name__ == '__main__':
             logger.info('Done performing analysis. Run this command again in an hour or so.')
 
         elif args.subparser == 'check-price':
-            logger.info('Checking the coin\'s current price (as of %d) and storing in the database...' % time.time())
+            #logger.info('Checking the coin\'s current price (as of %d) and storing in the database...' % time.time())
             # NOTE: dont use cache; it doesn't track which coin it's caching
             # XXX/HACK: this is pretty hacky
             if config.get('bot.coin') not in ['BTC', 'ETH']:
