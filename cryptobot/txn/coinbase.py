@@ -71,7 +71,7 @@ def order(txn_side: str, txn_size: float, txn_funds: float):
         # desired amount of quote currency to use
         parameters['funds'] = txn_funds
 
-    logger.debug(f'Placing {txn_side.upper()} order :: {product_id} :: %.2f ETH || %.2f USD...' % (txn_size, txn_funds))
+    logger.debug(f'Placing {txn_side.upper()} order :: {product_id} :: %.2f {coin} || %.2f USD...' % (txn_size, txn_funds))
 
     if not config.get('coinbase.enable-trades', True):
         logger.warning('Nevermind! Coinbase transactions are disabled. Exiting...')
@@ -79,13 +79,17 @@ def order(txn_side: str, txn_size: float, txn_funds: float):
 
     # https://docs.pro.coinbase.com/#place-a-new-order
     results = requests.post(BASE_URL + '/orders', json=parameters, auth=auth).json()
+    logger.debug('RESULTS 2: ' + str(results) + ' type ' + str(type(results)) + 'dir' + str(dir(results)))
     assert results.get('message') != 'Forbidden', 'Permission to trade denied, check API key permissions.'
+    if (message := results.get('message')):
+        raise ValueError('Failed to make transaction: ' + str(message))
     time.sleep(API_DELAY)
 
     # store order in db
     # Example `results`: {"id": "3fa3d9c4-33a8-4c5c-96c8-643cf33d4262", "size": "5", "product_id": "ETH-USD", "side": "buy", "stp": "dc", "funds": "199.00507629", "type": "market", "post_only": false, "created_at": "2020-11-24T05:27:13.272383Z", "fill_fees": "0", "filled_size": "0", "executed_value": "0", "status": "pending", "settled": false}
+    logger.debug('Placed order. Results:' + str(results))
     c = database.database()
-    c.execute('INSERT INTO `orders` (`product_id`, `order_id`, `side`, `size`, `funds`) VALUES (?, ?, ?, ?, ?)', (product_id, results['id'], txn_side, float(results['size']), float(results['funds'])))
+    c.execute('INSERT INTO `orders` (`product_id`, `order_id`, `side`, `size`, `funds`) VALUES (?, ?, ?, ?, ?)', (product_id, results['id'], txn_side, float(txn_size), float(txn_funds)))
     database.commit()
     c.close()
 

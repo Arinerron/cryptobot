@@ -88,7 +88,9 @@ if __name__ == '__main__':
 
         parser_status = subparsers.add_parser('status')
         parser_analyze_market = subparsers.add_parser('analyze-market')
-        parser_analyze_market = subparsers.add_parser('check-price')
+        parser_check_price = subparsers.add_parser('check-price')
+
+        parser_analyze_market.add_argument('-f', '--force', default=False, action='store_true')
 
         args = parser.parse_args()
 
@@ -139,7 +141,7 @@ if __name__ == '__main__':
 
         elif args.subparser == 'analyze-market':
             logger.info('Performing market analysis as of %s (%d)...' % (str(datetime.datetime.now()), time.time()))
-            cryptobot.analysis.analyze_market()
+            cryptobot.analysis.analyze_market(test_run=args.force)
             logger.info('Done performing analysis. Run this command again in an hour or so.')
 
         elif args.subparser == 'check-price':

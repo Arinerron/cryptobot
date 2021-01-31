@@ -54,6 +54,13 @@ def sign(value: float) -> int:
     return abs(value) / value
 
 
+# rounds n to nearest m
+# round_dec(1.2345, 0.001) -> 1.235
+def round_dec(n: float, m: float) -> float:
+    num_zeros = lambda n: math.ceil(math.log(1 / n) / math.log(10))
+    return round(float(n), num_zeros(float(m)))
+
+
 # normalize movement score by forcing it to be between certain values (using a curve)
 def curve(value: float, max_score: int) -> float:
     return sign(value) * max_score * (1 + (-1 / math.sqrt(abs(value) + 1)))
@@ -131,7 +138,8 @@ def get_movement_score() -> float:
 
 
 # check the market for new movements and make actions if necessary (main function)
-def analyze_market():
+# test_run doesn't save record of the run and bypasses stale checks. warning: will make txns
+def analyze_market(test_run: bool=False) -> bool:
     movement_score = get_movement_score()
     logger.debug('Movement score: %.6f' % movement_score)
     last_movement_score = None
@@ -151,12 +159,12 @@ def analyze_market():
         analysis_runs_every = 60 * 60 # how many seconds between each run. DO NOT CHANGE THIS!
 
         # ensure the last movement score is valid
-        if time_since_last_run < analysis_runs_every - time_buffer:
+        if time_since_last_run < analysis_runs_every - time_buffer and not test_run:
             # nope! it's already run, so we don't need to / shouldn't run it again
             logger.warning('Skipping analysis as it ran %s ago which is within the last hour.' % format_seconds(time_since_last_run))
             logger.debug('You should rerun analysis in %s.' % (format_seconds(analysis_runs_every - time_since_last_run)))
             return False
-        elif time_since_last_run > (2 * analysis_runs_every) + time_buffer:
+        elif time_since_last_run > (2 * analysis_runs_every) + time_buffer and not test_run:
             # nope! the change score is too old
             # otherwise we could misinterpret the movement change score
             logger.warning('Analysis last run %s ago, rendering last movement score stale.' % format_seconds(time_since_last_run))
@@ -165,10 +173,11 @@ def analyze_market():
             logger.debug('Last analysis job was %s ago.' % format_seconds(time_since_last_run))
 
     # store the movement score in the db for future fetching regardless of if first run
-    c = database.database()
-    c.execute('INSERT INTO `movement_score_history` (`product_id`, `score`) VALUES (?, ?)', (config.get('bot.coin') + '-USD', movement_score))
-    database.commit()
-    c.close()
+    if not test_run:
+        c = database.database()
+        c.execute('INSERT INTO `movement_score_history` (`product_id`, `score`) VALUES (?, ?)', (config.get('bot.coin') + '-USD', movement_score))
+        database.commit()
+        c.close()
 
     # check if first run
     if last_movement_score == None:
@@ -236,8 +245,11 @@ def analyze_market():
         if txn_size or txn_funds:
             assert not (txn_size and txn_funds)
 
+            txn_size = round_dec(txn_size, config.get('bot.increments.coin'))
+            txn_funds = round_dec(txn_funds, config.get('bot.increments.usd'))
+
             # make pretty print
-            logger.debug('Balance before transaction :: %.2f %s || %.2f USD' % (coin_balance, config.get('bot.coin'), usd_balance))
+            logger.debug('Balance before transaction :: %.4f %s || %.2f USD' % (coin_balance, config.get('bot.coin'), usd_balance))
             message = f'Placing {config.get("bot.coin")}-USD {txn_side.upper()} order of ' + str('%.4f coin' % txn_size if txn_size else '$%.02f USD' % txn_funds) + '...'
             logger.info(message)
             notifier.send('order', message)
