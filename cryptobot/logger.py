@@ -62,8 +62,10 @@ def parse_log_level(level: str) -> int:
     return min_level
 
 
-def log(level: int, message: str, show_ts=True):
+def log(level: int, *messages: list, show_ts=True):
     log_settings = get_log_settings()
+
+    message = ' '.join([str(x) for x in messages])
 
     file_level = parse_log_level(cryptobot.config.get('bot.log.file', 'err'))
     stdout_level = parse_log_level(cryptobot.config.get('bot.log.stdout', 'err'))

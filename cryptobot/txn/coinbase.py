@@ -79,7 +79,6 @@ def order(txn_side: str, txn_size: float, txn_funds: float):
 
     # https://docs.pro.coinbase.com/#place-a-new-order
     results = requests.post(BASE_URL + '/orders', json=parameters, auth=auth).json()
-    logger.debug('RESULTS 2: ' + str(results) + ' type ' + str(type(results)) + 'dir' + str(dir(results)))
     assert results.get('message') != 'Forbidden', 'Permission to trade denied, check API key permissions.'
     if (message := results.get('message')):
         raise ValueError('Failed to make transaction: ' + str(message))
@@ -87,7 +86,7 @@ def order(txn_side: str, txn_size: float, txn_funds: float):
 
     # store order in db
     # Example `results`: {"id": "3fa3d9c4-33a8-4c5c-96c8-643cf33d4262", "size": "5", "product_id": "ETH-USD", "side": "buy", "stp": "dc", "funds": "199.00507629", "type": "market", "post_only": false, "created_at": "2020-11-24T05:27:13.272383Z", "fill_fees": "0", "filled_size": "0", "executed_value": "0", "status": "pending", "settled": false}
-    logger.debug('Placed order. Results:' + str(results))
+    logger.debug('Placed order. Results:', results)
     c = database.database()
     c.execute('INSERT INTO `orders` (`product_id`, `order_id`, `side`, `size`, `funds`) VALUES (?, ?, ?, ?, ?)', (product_id, results['id'], txn_side, float(txn_size), float(txn_funds)))
     database.commit()
