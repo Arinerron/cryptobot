@@ -38,7 +38,7 @@ def parse_flash(case: str) -> tuple:
     return abs(percent), total
 
 
-def check_flash(use_cache: bool=False):
+def check_flash(use_cache: bool=False) -> None:
     bot_flash = config.get('bot.flash', [])
 
     assert isinstance(bot_flash, list)

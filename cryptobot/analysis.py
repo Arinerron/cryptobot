@@ -23,6 +23,8 @@ txn = {
 assert txn != None, 'Invalid transaction (txn) harness specified'
 
 # we want to weigh different price changes over time
+# WARN: don't change these without ensuring the bot doesn't make a trade based
+#   on the change in the score! Like, this changes the algorithm a lot.
 WEIGHTS = {
     # hours ago: weight multiplier
     1: 0.4, # 1 hour ago

@@ -2,6 +2,7 @@
 
 import shutil
 import os
+import subprocess
 import sys
 import time
 import datetime
@@ -87,6 +88,8 @@ if __name__ == '__main__':
         subparsers = parser.add_subparsers(dest='subparser')
 
         parser_status = subparsers.add_parser('status')
+        parser_logs = subparsers.add_parser('log')
+
         parser_analyze_market = subparsers.add_parser('analyze-market')
         parser_check_price = subparsers.add_parser('check-price')
 
@@ -139,6 +142,11 @@ if __name__ == '__main__':
                 name, numb = stat
                 logger.info('... %s: %s' % (name, str(numb)), show_ts=False)
 
+        elif args.subparser in ['log', 'logs']:
+            # XXX: make the path '/var/log/cryptobot.log' a config option
+            p = subprocess.Popen(['less', '+F', '+G', '/var/log/cryptobot.log'])
+            p.wait()
+
         elif args.subparser == 'analyze-market':
             logger.info('Performing market analysis as of %s (%d)...' % (str(datetime.datetime.now()), time.time()))
             cryptobot.analysis.analyze_market(test_run=args.force)
@@ -157,7 +165,7 @@ if __name__ == '__main__':
             logger.info('Current ETH-USD price is %.2f USD / ETH.' % eth_price)
             # NOTE: the coin cache is corrupted at this point, don't do more logic!
             cryptobot.flash.check_flash(use_cache=False)
-            
+
     except Exception as e:
         msg = 'Exception raised:\n' + ''.join(traceback.TracebackException.from_exception(e).format())
         logger.critical(msg)

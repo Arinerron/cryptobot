@@ -52,7 +52,7 @@ def get_historic_price(unixts: int) -> float: # TODO: implement caching
     # fetch timestamp data
     encode_ts = lambda ts: datetime.datetime.utcfromtimestamp(ts).isoformat() # ISO 8601
     start = encode_ts(unixts)
-    end = encode_ts(unixts+60)
+    end = encode_ts(unixts + 60)
     r = requests.get(BASE_URL + f'/products/{product_id}/candles?start={start}&end={end}&granularity=60', auth=auth).json()
     time.sleep(API_DELAY)
 

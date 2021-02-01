@@ -76,6 +76,7 @@ def log(level: int, *messages: list, show_ts=True):
     if level >= stdout_level:
         print(data)
     if level >= file_level:
+        # XXX: make this a config option
         with open('/var/log/cryptobot.log', 'a') as f:
             f.write(data + '\n')
 
