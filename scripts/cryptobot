@@ -148,6 +148,9 @@ if __name__ == '__main__':
             msg = ''
             now = datetime.datetime.now()
 
+            coin = config.get('bot.coin', 'coin')
+            product_id = f'{coin}-USD'
+
             COLOR_BLUE = '\033[34m'
             COLOR_BLUE_BOLD = '\033[1;34m'
             COLOR_RED = '\033[31m'
@@ -156,7 +159,6 @@ if __name__ == '__main__':
             COLOR_GREEN_BOLD = '\033[1;32m'
             COLOR_RESET = '\033[0m'
 
-            product_id = config.get('bot.coin') + '-USD'
             c = database.database()
             r = c.execute('SELECT * FROM `orders` WHERE `product_id`=?', (product_id,))
             while (row := r.fetchone()):
@@ -174,14 +176,14 @@ if __name__ == '__main__':
                 msg += (COLOR_RED_BOLD if action == 'sell' else COLOR_GREEN_BOLD) + action.upper().ljust(4) + ' '
 
                 if action == 'sell':
-                    msg += COLOR_RED + ' %.05f coin' % size + COLOR_BLUE + ' for ~' + format_usd(size * coin_price) + ' USD'
+                    msg += COLOR_RED + f' %.05f {coin}' % size + COLOR_BLUE + ' for ~' + format_usd(size * coin_price) + ' USD'
                 else:
-                    msg += COLOR_GREEN + '~%.05f coin' % (funds / coin_price) + COLOR_BLUE + ' with ' +  format_usd(funds) + ' USD'
+                    msg += COLOR_GREEN + f'~%.05f {coin}' % (funds / coin_price) + COLOR_BLUE + ' with ' +  format_usd(funds) + ' USD'
 
                 msg += COLOR_RESET + '\t' + format_usd(coin_price) + '/coin' + '  ' + cryptobot.analysis.format_seconds(time.time() - unixts) + ' ago'
 
                 if portfolio:
-                    msg += f'\t{COLOR_BLUE}--|--{COLOR_RESET} ' + format_usd(portfolio[1] + (portfolio[0] * coin_price)) + ' USD total value'
+                    msg += f'\t{COLOR_BLUE}--{COLOR_RESET} ' + format_usd(portfolio[1] + (portfolio[0] * coin_price)) + ' total value'
 
                 msg += '\n'
 
