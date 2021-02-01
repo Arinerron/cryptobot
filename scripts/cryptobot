@@ -82,12 +82,14 @@ def getStats() -> list:
     c.close()
     return stats
 
+
 if __name__ == '__main__':
     try:
         parser = argparse.ArgumentParser()
         subparsers = parser.add_subparsers(dest='subparser')
 
         parser_status = subparsers.add_parser('status')
+        parser_orders = subparsers.add_parser('orders')
         parser_logs = subparsers.add_parser('log')
 
         parser_analyze_market = subparsers.add_parser('analyze-market')
@@ -142,9 +144,55 @@ if __name__ == '__main__':
                 name, numb = stat
                 logger.info('... %s: %s' % (name, str(numb)), show_ts=False)
 
+        elif args.subparser == 'orders':
+            msg = ''
+            now = datetime.datetime.now()
+
+            COLOR_BLUE = '\033[34m'
+            COLOR_BLUE_BOLD = '\033[1;34m'
+            COLOR_RED = '\033[31m'
+            COLOR_RED_BOLD = '\033[1;31m'
+            COLOR_GREEN = '\033[32m'
+            COLOR_GREEN_BOLD = '\033[1;32m'
+            COLOR_RESET = '\033[0m'
+
+            product_id = config.get('bot.coin') + '-USD'
+            c = database.database()
+            r = c.execute('SELECT * FROM `orders` WHERE `product_id`=?', (product_id,))
+            while (row := r.fetchone()):
+                # NOTE: Here are some example `row`s:
+                #   (None, datetime.datetime(2021, 2, 1, 0, 44, 29), 'BTC-USD', 'b8dce87f-0b32-44c7-afdd-7be800335e84', 'sell', 0.0010722, 0.0)
+                #   (None, datetime.datetime(2021, 2, 1, 1, 44, 29), 'BTC-USD', 'dc511b9f-7044-4856-8a1b-a2536e5ab512', 'buy', 0.0, 67.68)
+                _, ts, pid, oid, action, size, funds = row
+
+                unixts = ts.timestamp()
+                coin_price = cryptobot.analysis.history.get_historic_price(unixts, product_id_override=pid)
+                portfolio = cryptobot.txn.coinbase.get_historic_balance(unixts)
+                format_usd = lambda n: '${:,.2f}'.format(n)
+
+                msg += f'{COLOR_BLUE}|-- {COLOR_RESET}{str(ts)}  {COLOR_BLUE_BOLD}{pid}{COLOR_RESET}  '
+                msg += (COLOR_RED_BOLD if action == 'sell' else COLOR_GREEN_BOLD) + action.upper().ljust(4) + ' '
+
+                if action == 'sell':
+                    msg += COLOR_RED + ' %.05f coin' % size + COLOR_BLUE + ' for ~' + format_usd(size * coin_price) + ' USD'
+                else:
+                    msg += COLOR_GREEN + '~%.05f coin' % (funds / coin_price) + COLOR_BLUE + ' with ' +  format_usd(funds) + ' USD'
+
+                msg += COLOR_RESET + '\t' + format_usd(coin_price) + '/coin' + '  ' + cryptobot.analysis.format_seconds(time.time() - unixts) + ' ago'
+
+                if portfolio:
+                    msg += f'\t{COLOR_BLUE}--|--{COLOR_RESET} ' + format_usd(portfolio[1] + (portfolio[0] * coin_price)) + ' USD total value'
+
+                msg += '\n'
+
+            c.close()
+
+            p = subprocess.Popen(['less', '-r', '-f', '+G', '/dev/stdin'], stdin=subprocess.PIPE)
+            p.communicate(input=msg.encode('utf-8'))
+
         elif args.subparser in ['log', 'logs']:
             # XXX: make the path '/var/log/cryptobot.log' a config option
-            p = subprocess.Popen(['less', '+F', '+G', '/var/log/cryptobot.log'])
+            p = subprocess.Popen(['less', '-r', '+F', '+G', '/var/log/cryptobot.log'])
             p.wait()
 
         elif args.subparser == 'analyze-market':

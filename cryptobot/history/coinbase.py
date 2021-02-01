@@ -24,8 +24,8 @@ _current_price_cache_time = None
 
 
 # returns the coin price at a given unix timestamp in history
-def get_historic_price(unixts: int) -> float: # TODO: implement caching
-    product_id = config.get('bot.coin') + '-USD'
+def get_historic_price(unixts: int, product_id_override: str=None) -> float: # TODO: implement caching
+    product_id = product_id_override or (config.get('bot.coin') + '-USD')
     #logger.debug(f'Fetching {product_id} price at unix timestamp %d...' % unixts)
 
     # check if we already have the price history data point

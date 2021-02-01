@@ -4,6 +4,7 @@ from cryptobot import config, logger, database
 
 import requests
 import time
+import datetime
 import json
 
 import cryptobot.coinbase
@@ -16,6 +17,31 @@ CACHE_TIMEOUT = 10
 
 balance = None
 _balance_cache_time = None
+
+
+def get_historic_balance(unixts: int, product_id_override: str=None) -> tuple: # (coin, USD) or None
+    product_id = product_id_override or (config.get('bot.coin') + '-USD')
+
+    unixts = int(unixts)
+    c = database.database()
+    r = c.execute((
+        # XXX: should we ORDER BY so it's `current` before `historic` for source?
+        'SELECT `v` AS `unixts`, `coin`, `usd` FROM ('
+            # select the closest two values to what we're looking for
+            'SELECT MIN(CAST(strftime(\'%s\', `ts`) as integer)) as `v`, `coin`, `usd`, `product_id` FROM `portfolio_history` WHERE `product_id`=? AND `ts` >= ?'
+            'UNION SELECT MAX(CAST(strftime(\'%s\', `ts`) as integer)) as `v`, `coin`, `usd`, `product_id` FROM `portfolio_history` WHERE `product_id`=? AND `ts` <= ?'
+        # then select only values within 5 minutes of what we want
+        ') WHERE `unixts` NOT NULL AND ABS(? - `unixts`) <= (60 * 5) ORDER BY ABS(? - `unixts`) ASC LIMIT 1;'
+    ), (product_id, datetime.datetime.fromtimestamp(unixts), product_id, datetime.datetime.fromtimestamp(unixts), unixts, unixts))
+    row = r.fetchone()
+    c.close()
+
+    # check if we found one in the db
+    if row:
+        found_unixts, coin, usd = row
+        return (coin, usd)
+
+    return None
 
 
 # {"ETH": {"balance": ...}, "USD": {"balance": ...}}
