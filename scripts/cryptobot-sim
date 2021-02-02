@@ -1,0 +1,154 @@
+#!/usr/bin/env python3
+
+import shutil
+import os
+import subprocess
+import sys
+import time
+import datetime
+import argparse
+import traceback
+import pwd
+import uuid
+import cProfile
+import pstats
+
+
+# make /usr/share/cryptobot before importing it so it can create the sqlite db
+try:
+    os.makedirs('/usr/share/cryptobot')
+
+    cur_uid = os.geteuid()
+    cryptobot_uid = pwd.getpwnam('cryptobot').pw_uid
+
+    if cur_uid not in [0, cryptobot_uid]:
+        raise PermissionError('You must be root to run this script')
+    elif cur_uid == 0:
+        # leave root and get cryptobot privs
+        os.setuid(cryptobot_uid)
+        cur_uid = cryptobot_uid
+except PermissionError as e:
+    print('Permission denied. Are you root?')
+    raise e
+except FileExistsError:
+    pass
+
+try:
+    import cryptobot
+    from cryptobot import logger, database, config
+    from cryptobot.analysis import format_seconds
+    from cryptobot import notifier
+except ModuleNotFoundError as e:
+    print('Cannot import cryptobot module, is the bot installed properly?')
+    raise e
+
+
+def parse_date(date: str) -> datetime.datetime:
+    if isinstance(date, datetime.datetime):
+        return date
+
+    date = str(date)
+    try:
+        return datetime.datetime.fromtimestamp(int(date))
+    except ValueError:
+        # TODO: support more date formats
+        raise ValueError('Failed to parse date: ' + str(date))
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers(dest='subparser')
+
+    parser_run = subparsers.add_parser('run')
+    parser_run.add_argument('-i', '--coin', nargs='?', default=config.get('bot.coin')) # --coin BTC
+    parser_run.add_argument('-s', '--start') # --start <unixts>
+    parser_run.add_argument('-e', '--end') # --end <unixts>
+    parser_run.add_argument('-u', '--initial-value', nargs='?', default=3000) # splits between coin and usd automatically
+
+    args = parser.parse_args()
+
+    logger.debug('$ ' + ' '.join([("'%s'" % x if ' ' in x else x) for x in sys.argv]))
+    format_usd = lambda n: '${:,.2f}'.format(n)
+
+    if args.subparser == 'run':
+        uid = str(uuid.uuid4())
+        logger.LOG_FILE_PATH = '/var/log/cryptobot-sim-' + uid + '.log'
+        logger.info('Log file path: ' + logger.LOG_FILE_PATH)
+
+        notifier.USE_NOTIFICATIONS = False
+
+        # HACK: to configure a different coin
+        coin = args.coin.strip().upper()
+        product_id = coin + '-USD'
+        config.CONFIG['bot']['coin'] = coin
+
+        # XXX: HACK: make these configurable
+        config.CONFIG['bot']['log']['file'] = 'fatal'
+        config.CONFIG['bot']['log']['stdout'] = 'info'
+
+        # replace analysis harnesses
+        config.CONFIG['bot']['history-harness'] = 'sim'
+        config.CONFIG['bot']['txn-harness'] = 'sim'
+        cryptobot.analysis._update_harnesses()
+
+        database.close()
+        c = database.database(use_file=database._REG_DB, read_only=True)
+        def query_row(q, a):
+            r = c.execute(q, a)
+            row = r.fetchone()
+            return row
+
+        # default to oldest and newest dates for price_history
+        start = parse_date(args.start or query_row("SELECT `ts` FROM `price_history` WHERE `product_id`=? AND `source`='current' ORDER BY `ts` ASC LIMIT 1;", (product_id,))[0])
+        end = parse_date(args.end or query_row("SELECT `ts` FROM `price_history` WHERE `product_id`=? AND `source`='current' ORDER BY `ts` DESC LIMIT 1;", (product_id,))[0])
+        c.close()
+
+        initial_coin_price = cryptobot.analysis.history.get_historic_price(int(start.timestamp()))
+        logger.debug('Initial coin price: ' + str(initial_coin_price)) # XXX: formatting usd TODO
+        initial_usd = args.initial_value / 2
+        initial_coin = (args.initial_value / 2) / initial_coin_price
+        if_you_went_all_in_coins = args.initial_value / initial_coin_price
+        #logger.debug('Initial USD %.4f, coin %.4f' % (initial_usd, initial_coin))
+        cryptobot.analysis.txn.ACCOUNTS = {
+            'USD': {'balance': initial_usd, 'available': initial_usd},
+            coin: {'balance': initial_coin, 'available': initial_coin}
+        }
+
+        #### XXX: have logging use get_time()?
+
+        database.close()
+        database.CURRENT_DB = '/usr/share/cryptobot/history-sim-' + uid + '.db'
+        logger.info('Database file path: ' + database.CURRENT_DB)
+
+
+        cur_time = start
+        cryptobot.analysis.history.CURRENT_TIME = int(start.timestamp())
+        def print_balance():
+            price = cryptobot.analysis.history.get_current_price()
+            potential_usd = (cryptobot.analysis.txn.ACCOUNTS[coin]['balance'] * price) + cryptobot.analysis.txn.ACCOUNTS['USD']['balance']
+            logger.info('Accounts as of ' + str(cur_time) + ' / ' + str(cur_time.timestamp()) + ': (' + ' + '.join(['%.4f %s' % (float(deets['balance']), coin) for coin, deets in cryptobot.analysis.txn.ACCOUNTS.items()]) + ') == ' + format_usd(potential_usd))
+            logger.info('    Current cost/coin: ' + format_usd(price) + '/coin')
+            lost_potential_usd = initial_usd + (price * initial_coin)
+            all_in_at_start_usd = if_you_went_all_in_coins * price
+            logger.info('    If you had just held instead of using bot with initial balance: ' + format_usd(lost_potential_usd) + '\t ... %d' % (100 * potential_usd / lost_potential_usd) + '% when using bot')
+            logger.info('    If you\'d gone all-in at the start: ' + format_usd(all_in_at_start_usd) + '\t ... %d' % (100 * potential_usd / all_in_at_start_usd) + '% when using bot')
+
+        print_balance()
+        logger.info('-'*80)
+
+        i = 1
+        while cur_time < end:
+            cryptobot.analysis.history.CURRENT_TIME = int(cur_time.timestamp())
+            #with cProfile.Profile() as profile:
+            cryptobot.analysis.analyze_market()
+            #    ps = pstats.Stats(profile)
+            #    ps.print_stats()
+
+            if i % 24 == 0:
+                print_balance()
+
+            cur_time += datetime.timedelta(0, 60 * 60) # cur_time += 1 hour
+            i += 1
+
+        logger.info('-'*80)
+        print_balance()

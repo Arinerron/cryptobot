@@ -7,6 +7,9 @@ import datetime
 import cryptobot
 
 
+# don't change this without checking implications in shell scripts
+LOG_FILE_PATH = '/var/log/cryptobot.log'
+
 LOG_CRITICAL, LOG_FATAL = 4, 4
 LOG_ERROR, LOG_ERR = 3, 3
 LOG_WARNING, LOG_WARN = 2, 2
@@ -77,7 +80,7 @@ def log(level: int, *messages: list, show_ts=True):
         print(data)
     if level >= file_level:
         # XXX: make this a config option
-        with open('/var/log/cryptobot.log', 'a') as f:
+        with open(LOG_FILE_PATH, 'a') as f:
             f.write(data + '\n')
 
     if settings.get('hook'):

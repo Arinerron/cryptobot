@@ -82,7 +82,7 @@ def order(txn_side: str, txn_size: float, txn_funds: float):
     # make sure transaction settings are valid
     assert txn_side in ['buy', 'sell'], 'Invalid transaction side.'
     assert (txn_size == 0) or (txn_funds == 0), 'Either size or funds must be 0.'
-    assert not (txn_size ==0 and txn_funds == 0), 'Size and funds cannot both be 0.'
+    assert not (txn_size == 0 and txn_funds == 0), 'Size and funds cannot both be 0.'
 
     parameters = {
         'type': 'market',

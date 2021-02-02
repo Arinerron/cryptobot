@@ -10,6 +10,6 @@ setup(
     author = 'Aaron Esau',
     author_email = 'python@aaronesau.com',
     packages = find_packages(),
-    scripts = ['scripts/cryptobot'],
+    scripts = ['scripts/cryptobot', 'scripts/cryptobot-sim'],
     python_requires = '>=3.6'
 )

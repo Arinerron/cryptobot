@@ -13,6 +13,7 @@ error() {
 export DEB_PACKAGES="python3 python3-pip sqlite3"
 
 export BIN_PATH="/usr/local/bin/cryptobot"
+export BIN_SIM_PATH="/usr/local/bin/cryptobot"
 export SHARE_PATH="/usr/share/cryptobot"
 export LOG_FILE_PATH="/var/log/cryptobot.log"
 export SYSTEMD_PATH="/usr/lib/systemd/system"
@@ -54,6 +55,8 @@ chmod -R 600 "$SHARE_PATH" "$LOG_FILE_PATH"
 chmod 755 "$SHARE_PATH"
 chown root:cryptobot "$BIN_PATH"
 chmod 750 "$BIN_PATH"
+chown root:cryptobot "$BIN_SIM_PATH"
+chmod 750 "$BIN_SIM_PATH"
 
 cp -u cryptobot.service cryptobot.timer "$SYSTEMD_PATH"
 cp -u cryptobot-check-price.service cryptobot-check-price.timer "$SYSTEMD_PATH"

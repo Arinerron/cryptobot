@@ -23,6 +23,11 @@ current_price = None
 _current_price_cache_time = None
 
 
+# get the current time, but simulated
+def get_time() -> float:
+    return float(time.time())
+
+
 # returns the coin price at a given unix timestamp in history
 def get_historic_price(unixts: int, product_id_override: str=None) -> float: # TODO: implement caching
     product_id = product_id_override or (config.get('bot.coin') + '-USD')
@@ -76,7 +81,7 @@ def get_historic_price(unixts: int, product_id_override: str=None) -> float: # T
 # get the current price of the selected coin
 def get_current_price(use_cache: bool=True, product_id_override: str=None, commit: bool=True) -> float:
     global current_price, _current_price_cache_time
-    cur_time = time.time()
+    cur_time = get_time()
 
     product_id = config.get('bot.coin') + '-USD' # XXX: changing this mid-program could potentially mess up cached price since it wouldn't update if cached
 

@@ -3,6 +3,7 @@
 from cryptobot import config, logger
 import requests
 
+
 _NOTIFIER_LOCK = False # to prevent exceptions from causing recursion on "error" cause
 SUBJECTS = {
     'error': 'Cryptobot Error Detected',
@@ -10,6 +11,7 @@ SUBJECTS = {
     'flash': 'Cryptobot Flash Change Detected'
 }
 
+USE_NOTIFICATIONS = True
 
 class TwilioNotifier:
     @staticmethod
@@ -61,6 +63,10 @@ def _get_handles(key: str) -> list:
 
 
 def send(cause: str, *msg) -> bool:
+    # force don't send notifications. for simulations
+    if not USE_NOTIFICATIONS:
+        return False
+
     global _NOTIFIER_LOCK
     if _NOTIFIER_LOCK:
         return False

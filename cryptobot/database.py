@@ -2,28 +2,54 @@
 
 import sqlite3
 
-conn = None
+conns = dict()
+
+_REG_DB = '/usr/share/cryptobot/history.db'
+CURRENT_DB = _REG_DB
 
 # get a cursor
-def database():
-    global conn
-    
+def database(use_file: str=None, read_only: bool=False):
+    global conns, CURRENT_DB
+    _old_current_db = CURRENT_DB
+
+    if use_file == None:
+        use_file = CURRENT_DB
+    else:
+        CURRENT_DB = use_file
+
+    args = {}
+    if read_only:
+        args['uri'] = True
+
     # create the database if not exist
-    if not conn:
-        conn = sqlite3.connect('/usr/share/cryptobot/history.db', detect_types=sqlite3.PARSE_DECLTYPES)
-        _init_database(conn)
-    
-    return conn.cursor()
+    if not conns.get(use_file):
+        conns[use_file] = sqlite3.connect(use_file, detect_types=sqlite3.PARSE_DECLTYPES, **args)
+
+        if not read_only:
+            # none of this would be able to run if it was readonly anyway
+            _init_database(conns[use_file])
+
+    CURRENT_DB = _old_current_db
+
+    return conns[use_file].cursor()
 
 
-def commit():
-    global conn
-    return conn.commit()
+def close() -> None:
+    global conns
+    if conns.get(CURRENT_DB):
+        retval = conns[CURRENT_DB].close()
+        del conns[CURRENT_DB]
+        return retval
 
 
-def _init_database(conn):
+def commit() -> None:
+    global conns
+    return conns[CURRENT_DB].commit()
+
+
+def _init_database(conn) -> None:
     c = conn.cursor()
-    
+
     c.execute(
         'CREATE TABLE IF NOT EXISTS `orders` ('
         	'`id` INT AUTO_INCREMENT,'
@@ -37,7 +63,7 @@ def _init_database(conn):
 	        'PRIMARY KEY (`id`)'
         ');'
     )
-    
+
     c.execute(
         'CREATE TABLE IF NOT EXISTS `price_history` ('
 	        '`id` INT AUTO_INCREMENT,'
@@ -52,7 +78,7 @@ def _init_database(conn):
 	        'PRIMARY KEY (`id`)'
         ');'
     )
-    
+
     c.execute(
         'CREATE TABLE IF NOT EXISTS `portfolio_history` ('
 	        '`id` INT AUTO_INCREMENT,'
@@ -63,7 +89,7 @@ def _init_database(conn):
 	        'PRIMARY KEY (`id`)'
         ');'
     )
-    
+
     c.execute(
         'CREATE TABLE IF NOT EXISTS `movement_score_history` ('
 	        '`id` INT AUTO_INCREMENT,'
@@ -73,6 +99,6 @@ def _init_database(conn):
 	        'PRIMARY KEY (`id`)'
         ');'
     )
-    
+
     commit()
     c.close()

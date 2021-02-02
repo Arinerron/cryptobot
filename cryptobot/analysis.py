@@ -9,18 +9,21 @@ import datetime
 import cryptobot
 
 
-# pick which harness to use from the config
-history = {
-    'coinbase': cryptobot.history.coinbase,
-    'sim': cryptobot.history.sim
-}.get(config.get('bot.history-harness', 'coinbase'))
-assert history != None, 'Invalid history harness specified'
+history, txn = None, None
+def _update_harnesses() -> None:
+    global history, txn
+    # pick which harness to use from the config
+    history = {
+        'coinbase': cryptobot.history.coinbase,
+        'sim': cryptobot.history.sim
+    }.get(config.get('bot.history-harness', 'coinbase'))
+    assert history != None, 'Invalid history harness specified'
 
-txn = {
-    'coinbase': cryptobot.txn.coinbase,
-    'sim': cryptobot.txn.sim
-}.get(config.get('bot.txn-harness', 'coinbase'))
-assert txn != None, 'Invalid transaction (txn) harness specified'
+    txn = {
+        'coinbase': cryptobot.txn.coinbase,
+        'sim': cryptobot.txn.sim
+    }.get(config.get('bot.txn-harness', 'coinbase'))
+    assert txn != None, 'Invalid transaction (txn) harness specified'
 
 # we want to weigh different price changes over time
 # WARN: don't change these without ensuring the bot doesn't make a trade based
@@ -127,7 +130,7 @@ def get_minimum_trade_size() -> tuple:
 # calculate the price movement score
 def get_movement_score() -> float:
     raw_score = 0
-    cur_time = time.time()
+    cur_time = history.get_time()
 
     for period, weight in WEIGHTS.items():
         unixts = cur_time - (period * 60 * 60)
@@ -155,7 +158,7 @@ def analyze_market(test_run: bool=False) -> bool:
     # if there was result (i.e. this is not the first run)
     if row:
         ts, last_movement_score = row
-        time_since_last_run = time.time() - datetime.datetime.strptime(ts, '%Y-%m-%d %H:%M:%S').timestamp()
+        time_since_last_run = history.get_time() - datetime.datetime.strptime(ts, '%Y-%m-%d %H:%M:%S').timestamp()
 
         time_buffer = 60 * 5 # how many seconds off is acceptable
         analysis_runs_every = 60 * 60 # how many seconds between each run. DO NOT CHANGE THIS!
@@ -177,7 +180,7 @@ def analyze_market(test_run: bool=False) -> bool:
     # store the movement score in the db for future fetching regardless of if first run
     if not test_run:
         c = database.database()
-        c.execute('INSERT INTO `movement_score_history` (`product_id`, `score`) VALUES (?, ?)', (config.get('bot.coin') + '-USD', movement_score))
+        c.execute('INSERT INTO `movement_score_history` (`ts`, `product_id`, `score`) VALUES (?, ?, ?)', (datetime.datetime.fromtimestamp(history.get_time()), config.get('bot.coin') + '-USD', movement_score))
         database.commit()
         c.close()
 

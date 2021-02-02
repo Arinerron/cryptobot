@@ -85,6 +85,8 @@ def getStats() -> list:
 
 if __name__ == '__main__':
     try:
+        cryptobot.analysis._update_harnesses()
+
         parser = argparse.ArgumentParser()
         subparsers = parser.add_subparsers(dest='subparser')
 

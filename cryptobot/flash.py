@@ -38,6 +38,8 @@ def parse_flash(case: str) -> tuple:
     return abs(percent), total
 
 
+# NOTE: this code is only called from scripts/cryptobot, not sim. So we don't
+#   need to worry about the time.time() call
 def check_flash(use_cache: bool=False) -> None:
     bot_flash = config.get('bot.flash', [])
 
@@ -47,7 +49,7 @@ def check_flash(use_cache: bool=False) -> None:
 
     for case in bot_flash:
         percent_threshold, total_offset = parse_flash(case)
-        percent = analysis.history.get_percent_change(time.time() - total_offset, use_cache=use_cache)
+        percent = analysis.history.get_percent_change(analysis.history.get_time() - total_offset, use_cache=use_cache)
         if abs(percent) >= percent_threshold:
             message = 'Flash ' + ('crash' if analysis.is_bear_market(percent) else 'rally') + ' detected; percent change %.4f is above the %.4f threshold for %s.' % (percent, percent_threshold, analysis.format_seconds(total_offset))
             logger.info(message)
